@@ -1,0 +1,1 @@
+"Evaluate at WORD LEVEL tinyStress-15K-final-word_level:"{"eval_accuracy": 0.992358169283163, "eval_precision": 0.9696092619392185, "eval_recall": 0.9640287769784173, "eval_f1": 0.9668109668109668}

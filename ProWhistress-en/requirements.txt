@@ -1,0 +1,37 @@
+# Core deep learning
+# Install PyTorch with CUDA support from: https://pytorch.org/get-started/locally/
+# e.g.: pip install torch==2.8.0 torchaudio --index-url https://download.pytorch.org/whl/cu128
+torch>=2.0.0
+torchaudio>=2.0.0
+
+# Hugging Face ecosystem
+transformers==4.56.0
+datasets==4.0.0
+evaluate==0.4.5
+accelerate==1.10.1
+huggingface_hub==0.34.4
+safetensors==0.6.2
+tokenizers==0.22.0
+
+# Whisper (OpenAI)
+openai-whisper==20250625
+tiktoken==0.11.0
+
+# Audio processing
+librosa==0.11.0
+soundfile==0.13.1
+scipy==1.16.1
+
+# Machine learning utilities
+scikit-learn==1.7.1
+numpy==2.2.6
+
+# Visualization
+matplotlib==3.10.6
+
+# UI (optional, required for app_ui.py)
+gradio
+
+# Utilities
+tqdm==4.67.1
+
