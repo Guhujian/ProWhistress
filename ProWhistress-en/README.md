@@ -1,5 +1,12 @@
 # ProWhistress-en
 
+**[Interspeech 2026] ProWhistress: Enriching Transcriptions with Prosody-Aware Sentence Stress Detection**
+
+
+This repository contains the official English implementation of **ProWhistress**, a dual-stream speech transcription architecture that augments the Whisper backbone with explicit acoustic modeling to effectively resolve the semantic-prosodic trade-off in alignment-free sentence stress detection.
+
+---
+
 ## Getting Started
 
 ### Install Dependencies
