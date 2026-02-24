@@ -1,6 +1,7 @@
 # ProWhistress-cn
 
-A Chinese speech emphasis detection model based on Whisper, extended with a StressEncoder, an additional decoder block, and a gated residual fusion mechanism.
+This repository contains the official Chinese implementation of **ProWhistress**, a dual-stream speech transcription architecture that augments the Whisper backbone with explicit acoustic modeling to effectively resolve the semantic-prosodic trade-off in alignment-free sentence stress detection.
+
 
 ## Getting Started
 
