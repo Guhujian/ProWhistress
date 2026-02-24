@@ -15,6 +15,9 @@ pip install -r requirements.txt
 
 ## Usage
 
+### 📊 Dataset & Reproducibility
+Due to double-blind constraints, the full **SinoStress** and **SinoStressReal** datasets will be released after acceptance.
+
 ### Training
 
 ```bash
