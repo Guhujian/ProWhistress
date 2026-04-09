@@ -1,4 +1,5 @@
-# train.py 该文件为WhiStress模型的训练主入口，包含训练、评估、参数解析等流程
+# train.py is the main entry point for WhiStress training,
+# including training, evaluation, and argument parsing.
 import torch
 import numpy as np
 import os
@@ -18,15 +19,15 @@ from .metrics import WhiStressMetrics
 CURRENT_DIR = Path(__file__).parent
 WANDB_API_KEY = os.environ.get("WAND_API_KEY", None)
 
-# 自定义回调，支持保存时处理特殊类型
+# Custom callback with extra save-time handling for special types.
 class CustomCallback(TrainerCallback):
     def __init__(self):
         super().__init__()
-        # 使用根日志记录器确保输出到终端
+        # Use a dedicated logger to ensure output is visible in terminal logs.
         self.logger = logging.getLogger("whistress.training.train")
-        # 确保日志级别足够低以显示INFO消息
+        # Keep level low enough to show INFO messages.
         self.logger.setLevel(logging.INFO)
-        # 不再需要自定义的best_metric，使用Transformers内置的跟踪机制
+        # Rely on Transformers' built-in best-metric tracking.
     
     def on_save(self, args, state, control, **kwargs):
         # Example of handling serialization
@@ -34,75 +35,75 @@ class CustomCallback(TrainerCallback):
             state.metrics = state.metrics.tolist()
     
     def on_evaluate(self, args, state, control, logs=None, **kwargs):
-        """在每次评估后输出指标，最佳模型判断与保存交由Transformers内置流程处理"""
-        # 添加调试信息
-        print(f"🔍 CustomCallback.on_evaluate 被调用 - 步骤: {state.global_step}")
-        sys.stdout.flush()  # 强制刷新输出缓冲区
+        """Log metrics after each evaluation; best-model decisions are handled by Transformers."""
+        # Debug output
+        print(f"🔍 CustomCallback.on_evaluate called - step: {state.global_step}")
+        sys.stdout.flush()  # Force flush stdout buffer
         
-        # 兼容 metrics 参数（Transformers 标准传递的是 metrics 而不是 logs）
+        # Support metrics argument (Transformers usually passes metrics, not logs)
         if logs is None and "metrics" in kwargs:
             logs = kwargs["metrics"]
         
         if logs is None:
-            print("⚠️ logs 为 None，跳过评估")
+            print("⚠️ logs is None, skipping evaluation")
             sys.stdout.flush()
             return
             
-        # 获取当前的评估指标
+        # Get the current evaluation metric
         current_metric_key = args.metric_for_best_model
-        print(f"🎯 寻找指标: {current_metric_key}")
-        print(f"📋 可用指标: {list(logs.keys())}")
+        print(f"🎯 Looking for metric: {current_metric_key}")
+        print(f"📋 Available metrics: {list(logs.keys())}")
         sys.stdout.flush()
         
         if current_metric_key not in logs:
-            print(f"❌ 指标 {current_metric_key} 不在日志中")
+            print(f"❌ Metric {current_metric_key} is not present in logs")
             sys.stdout.flush()
             return
             
         current_metric = logs[current_metric_key]
-        print(f"📊 当前 {current_metric_key}: {current_metric:.4f}")
+        print(f"📊 Current {current_metric_key}: {current_metric:.4f}")
         
-        # 使用Transformers内置的最优模型跟踪机制
-        # 检查state.best_metric是否存在且已更新
+        # Use Transformers built-in best-model tracking
+        # Check whether state.best_metric exists and has been updated
         state_best_metric = getattr(state, 'best_metric', None)
-        print(f"🏆 Transformers内置最优指标: {state_best_metric}")
+        print(f"🏆 Transformers tracked best metric: {state_best_metric}")
         sys.stdout.flush()
         
-        # 检查是否是新的最优模型 - 使用Transformers的逻辑
+        # Check whether this is a new best model using Transformers logic
         is_better = False
         if state_best_metric is None:
             is_better = True
-            print(f"🆕 首次评估，设为最优模型")
+            print(f"🆕 First evaluation, set as current best model")
         else:
-            # 比较当前指标与Transformers跟踪的最优指标
+            # Compare current metric with Transformers tracked best metric
             if args.greater_is_better:
                 is_better = current_metric > state_best_metric
             else:
                 is_better = current_metric < state_best_metric
-            print(f"🔄 比较: 当前={current_metric:.4f} vs Transformers最优={state_best_metric:.4f}, 更好={is_better}")
+            print(f"🔄 Compare: current={current_metric:.4f} vs transformers_best={state_best_metric:.4f}, better={is_better}")
         sys.stdout.flush()
         
         if is_better:
-            print(f"🎉 发现新的最优模型! {current_metric_key}: {current_metric:.4f}")
-            print(f"📊 当前评估指标 - Accuracy: {logs.get('eval_accuracy', 'N/A'):.4f}, "
+            print(f"🎉 New best model found! {current_metric_key}: {current_metric:.4f}")
+            print(f"📊 Current evaluation metrics - Accuracy: {logs.get('eval_accuracy', 'N/A'):.4f}, "
                            f"Precision: {logs.get('eval_precision', 'N/A'):.4f}, "
                            f"Recall: {logs.get('eval_recall', 'N/A'):.4f}, "
                            f"F1: {logs.get('eval_f1', 'N/A'):.4f}")
             sys.stdout.flush()
             
-            self.logger.info(f"🎉 发现新的最优模型! {current_metric_key}: {current_metric:.4f}")
-            self.logger.info(f"📊 当前评估指标 - Accuracy: {logs.get('eval_accuracy', 'N/A'):.4f}, "
+            self.logger.info(f"🎉 New best model found! {current_metric_key}: {current_metric:.4f}")
+            self.logger.info(f"📊 Current evaluation metrics - Accuracy: {logs.get('eval_accuracy', 'N/A'):.4f}, "
                            f"Precision: {logs.get('eval_precision', 'N/A'):.4f}, "
                            f"Recall: {logs.get('eval_recall', 'N/A'):.4f}, "
                            f"F1: {logs.get('eval_f1', 'N/A'):.4f}")
         else:
-            print(f"📈 当前模型未超越最优模型 (Transformers最优: {state_best_metric:.4f})")
+            print(f"📈 Current model did not beat the best model (Transformers best: {state_best_metric:.4f})")
             sys.stdout.flush()
 
-# 主训练/评估流程
-# args: 命令行参数对象
+# Main training/evaluation flow
+# args: parsed command-line arguments
 def train_or_evaluate(args):
-    # 选择设备
+    # Select device
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger = logging.getLogger(__name__)
     logging.basicConfig(
@@ -115,24 +116,24 @@ def train_or_evaluate(args):
     whisper_config = WhisperConfig()
     layer_for_head = 9
     
-    # 打印模型配置信息
+    # Print model configuration
     msg = "\n" + "="*60 + "\n"
-    msg += "🔧 模型配置信息\n"
+    msg += "🔧 Model Configuration\n"
     msg += "="*60 + "\n"
-    msg += f"   - Whisper Decoder 提取层: {layer_for_head}\n"
-    msg += f"   - StressEncoder 输入层: {args.stress_encoder_input_layer}\n"
-    msg += f"   - Additional Decoder 输入层: {args.decoder_input_layer}\n"
-    msg += f"   - StressEncoder 正则化系数: {args.stress_reg_coeff}\n"
-    msg += f"   - 随机种子 (Seed): {args.seed}\n"
+    msg += f"   - Whisper Decoder extraction layer: {layer_for_head}\n"
+    msg += f"   - StressEncoder input layer: {args.stress_encoder_input_layer}\n"
+    msg += f"   - Additional Decoder input layer: {args.decoder_input_layer}\n"
+    msg += f"   - StressEncoder regularization coefficient: {args.stress_reg_coeff}\n"
+    msg += f"   - Random seed: {args.seed}\n"
     msg += "="*60 + "\n"
     print(msg)
     sys.stdout.flush()
     logger.info("Model Configuration:\n" + msg)
 
-    # 加载模型或新建模型
+    # Load model or initialize a new one
     if args.model_path:
         logger.info(f"Loading model from {args.model_path}")
-        # 尝试从保存的元数据中读取 layer_for_head 与 d_ctx
+        # Try loading layer_for_head and d_ctx from saved metadata
         meta_path = os.path.join(args.model_path, "metadata.json")
         d_ctx_meta = args.d_ctx
         stress_encoder_input_layer_meta = args.stress_encoder_input_layer
@@ -179,14 +180,14 @@ def train_or_evaluate(args):
             freeze_stress_encoder=args.freeze_stress_encoder,
         ).to(device)
     
-    # 设置tokenizer输入名
+    # Set tokenizer input names
     whistress_model.processor.tokenizer.model_input_names = [
         "input_ids",
         "attention_mask",
         "labels_head",
     ]
     
-    # 构建数据整理器
+    # Build data collator
     data_collator = DataCollatorSpeechSeq2SeqWithPadding(
         processor=whistress_model.processor,
         decoder_start_token_id=whistress_model.whisper_model.config.decoder_start_token_id,
@@ -198,18 +199,18 @@ def train_or_evaluate(args):
     )
 
     train, val = None, None
-    # 加载训练集和验证集
+    # Load train and validation sets
     if args.is_train:
         DatasetTrain = load_data(whistress_model, args.transcription_column_name, dataset_name=args.dataset_train, save_path=args.dataset_path)
         train, val, _ = DatasetTrain.split_train_val_test()
-    # 加载测试集
+    # Load test set
     DatasetEval = load_data(whistress_model, args.transcription_column_name, dataset_name=args.dataset_eval, save_path=args.dataset_path)
     _, _, test = DatasetEval.split_train_val_test()
     
     print(f"Output path for the training run: {args.output_path}")
     output_path = args.output_path
 
-    # wandb日志
+    # Weights & Biases logging
     if WANDB_API_KEY and args.is_train:
         import wandb
         wandb.login(key=WANDB_API_KEY)
@@ -224,7 +225,7 @@ def train_or_evaluate(args):
             dir=output_path,
         )
 
-    # 训练参数
+    # Training arguments
     training_args = Seq2SeqTrainingArguments(
         output_dir=output_path,  # change to a repo name of your choice
         # per_device_train_batch_size=4, # assuming 8 gpus. decrease to ~2 for small dataset, increase to ~4 for large dataset.
@@ -236,7 +237,7 @@ def train_or_evaluate(args):
         num_train_epochs=2, # Increase to 4 for task-specific evaluation, use 2 for zero-shot - More generalized evaluation. 
         seed=args.seed,
         gradient_checkpointing=False,
-        fp16=False,  # 启用半精度浮点数训练以节省显存和加速训练
+        fp16=False,  # Enable mixed precision if needed to reduce memory and speed up training.
         do_train=True,
         do_eval=True,  
         eval_strategy="steps",
@@ -245,10 +246,10 @@ def train_or_evaluate(args):
         per_device_eval_batch_size=args.eval_batch_size,
         generation_max_length=96,
         save_steps=100,
-        save_total_limit=1,  # 只保存最新的2个检查点
-        load_best_model_at_end=True,  # 训练结束时加载最优模型
-        metric_for_best_model="eval_f1",  # 以验证集F1分数作为最优模型判断标准
-        greater_is_better=True,  # 对于F1分数，越大越好
+        save_total_limit=1,  # Keep only the most recent checkpoint(s).
+        load_best_model_at_end=True,  # Load the best model at the end of training.
+        metric_for_best_model="eval_f1",  # Use validation F1 as best-model criterion.
+        greater_is_better=True,  # For F1, higher is better.
         eval_steps=10,
         dataloader_num_workers=8,
         logging_steps=10,
@@ -258,63 +259,63 @@ def train_or_evaluate(args):
         label_names=[f"labels_head_{args.transcription_column_name}", "sentence_index", f"labels_{args.transcription_column_name}"],
         overwrite_output_dir=False, # change if you want to keep previous output
     )
-    # 设置随机种子
+    # Set random seed
     set_seed(training_args.seed)
     metrics = WhiStressMetrics()
 
-    # 输出训练配置
+    # Print training configuration
     if args.is_train:
         print("\n" + "="*60)
-        print("🔧 训练配置信息")
+        print("🔧 Training Configuration")
         print("="*60)
-        print(f"📁 输出目录: {args.output_path}")
-        print(f"🎯 训练数据集: {args.dataset_train}")
-        print(f"📊 评估数据集: {args.dataset_eval}")
-        print(f"📝 转录列名: {args.transcription_column_name}")
-        print(f"🧠 模型配置:")
-        print(f"   - Whisper 模型: {whisper_backbone_name}")
-        print(f"   - 应力编码器输入层: {args.stress_encoder_input_layer}")
-        print(f"   - Additional Decoder 输入层: {args.decoder_input_layer}")
-        print(f"   - Whisper Decoder 提取层: {layer_for_head}")
-        print(f"   - 解码器上下文长度: {args.d_ctx}")
-        print(f"   - 应力编码器层数: {args.stress_encoder_layers}")
+        print(f"📁 Output directory: {args.output_path}")
+        print(f"🎯 Training dataset: {args.dataset_train}")
+        print(f"📊 Evaluation dataset: {args.dataset_eval}")
+        print(f"📝 Transcription column: {args.transcription_column_name}")
+        print(f"🧠 Model settings:")
+        print(f"   - Whisper model: {whisper_backbone_name}")
+        print(f"   - StressEncoder input layer: {args.stress_encoder_input_layer}")
+        print(f"   - Additional Decoder input layer: {args.decoder_input_layer}")
+        print(f"   - Whisper Decoder extraction layer: {layer_for_head}")
+        print(f"   - Decoder context length: {args.d_ctx}")
+        print(f"   - StressEncoder layers: {args.stress_encoder_layers}")
         
-        # 计算模型参数量
+        # Calculate model parameter counts
         whistress_model.train()
         total_params = sum(p.numel() for p in whistress_model.parameters())
         trainable_params = sum(p.numel() for p in whistress_model.parameters() if p.requires_grad)
         frozen_params = total_params - trainable_params
         
-        print(f"📊 模型参数量:")
-        print(f"   - 总参数量: {total_params:,}")
-        print(f"   - 可训练参数: {trainable_params:,}")
-        print(f"   - 冻结参数: {frozen_params:,}")
-        print(f"   - 可训练比例: {trainable_params/total_params*100:.2f}%")
-        print(f"⚙️ 训练参数:")
-        print(f"   - 训练批次大小: {training_args.per_device_train_batch_size}")
-        print(f"   - 评估批次大小: {training_args.per_device_eval_batch_size}")
-        print(f"   - 学习率: {training_args.learning_rate}")
-        print(f"   - 训练轮数: {training_args.num_train_epochs}")
-        print(f"   - 随机种子: {training_args.seed}")
-        print(f"   - 梯度累积步数: {training_args.gradient_accumulation_steps}")
-        print(f"   - 权重衰减: {training_args.weight_decay}")
-        print(f"   - 预热比例: {training_args.warmup_ratio}")
-        print(f"   - 保存步数: {training_args.save_steps}")
-        print(f"   - 评估步数: {training_args.eval_steps}")
-        print(f"   - 最大生成长度: {training_args.generation_max_length}")
-        print(f"🎲 数据集信息:")
+        print(f"📊 Model parameters:")
+        print(f"   - Total parameters: {total_params:,}")
+        print(f"   - Trainable parameters: {trainable_params:,}")
+        print(f"   - Frozen parameters: {frozen_params:,}")
+        print(f"   - Trainable ratio: {trainable_params/total_params*100:.2f}%")
+        print(f"⚙️ Training arguments:")
+        print(f"   - Train batch size: {training_args.per_device_train_batch_size}")
+        print(f"   - Eval batch size: {training_args.per_device_eval_batch_size}")
+        print(f"   - Learning rate: {training_args.learning_rate}")
+        print(f"   - Num epochs: {training_args.num_train_epochs}")
+        print(f"   - Random seed: {training_args.seed}")
+        print(f"   - Gradient accumulation steps: {training_args.gradient_accumulation_steps}")
+        print(f"   - Weight decay: {training_args.weight_decay}")
+        print(f"   - Warmup ratio: {training_args.warmup_ratio}")
+        print(f"   - Save steps: {training_args.save_steps}")
+        print(f"   - Eval steps: {training_args.eval_steps}")
+        print(f"   - Max generation length: {training_args.generation_max_length}")
+        print(f"🎲 Dataset info:")
         if train is not None:
-            print(f"   - 训练集大小: {len(train)}")
+            print(f"   - Train set size: {len(train)}")
         if val is not None:
-            print(f"   - 验证集大小: {len(val)}")
+            print(f"   - Validation set size: {len(val)}")
         if test is not None:
-            print(f"   - 测试集大小: {len(test)}")
+            print(f"   - Test set size: {len(test)}")
         print("="*60)
         print()
 
     trainer_emphasis = None
     if args.is_train:
-        # 构建训练器
+        # Build trainer
         trainer_emphasis = WhiStressTrainer(
         args=training_args,
         model=whistress_model,
@@ -324,9 +325,9 @@ def train_or_evaluate(args):
         compute_metrics=metrics.compute_metrics,
         compute_loss_func=whistress_model.loss_fct,
         processing_class=whistress_model.processor.feature_extractor,
-        callbacks=[CustomCallback(), EarlyStoppingCallback(early_stopping_patience=20)],  # 添加自定义回调来监控最优模型
+        callbacks=[CustomCallback(), EarlyStoppingCallback(early_stopping_patience=20)],  # Add callback to monitor best model
         )
-        # 训练前评估
+        # Pre-training evaluation
         # trainer_emphasis.evaluate_at_word_level(
         #     # to ignore whisper_logits in the compute_metrics function (only the custom head logits are used)
         #     ignore_keys=["whisper_logits"],
@@ -339,8 +340,8 @@ def train_or_evaluate(args):
         #     eval_dataset=test,
         #     dataset_name=f"{args.dataset_eval}-initial",
         # )
-        # 开始训练
-        print("🚀 开始训练...")
+        # Start training
+        print("🚀 Starting training...")
         resume_from_checkpoint = args.resume_from_checkpoint
         print(f"DEBUG: args.resume_from_checkpoint = {args.resume_from_checkpoint}")
         if resume_from_checkpoint is not None:
@@ -349,30 +350,30 @@ def train_or_evaluate(args):
              elif resume_from_checkpoint.lower() == "false":
                  resume_from_checkpoint = None
         
-        # 自动检测断点
+        # Automatically detect checkpoint
         if resume_from_checkpoint is None and os.path.isdir(args.output_path):
             last_checkpoint = get_last_checkpoint(args.output_path)
             if last_checkpoint is not None:
-                print(f"🔍 自动检测到检查点: {last_checkpoint}，将从该检查点恢复训练。")
+            print(f"🔍 Checkpoint detected automatically: {last_checkpoint}. Training will resume from it.")
                 resume_from_checkpoint = last_checkpoint
                  
         print(f"DEBUG: Calling train(resume_from_checkpoint={resume_from_checkpoint})")
         
         trainer_emphasis.train(resume_from_checkpoint=resume_from_checkpoint)
-        print("✅ 训练完成!")
+        print("✅ Training completed!")
         
-        # 保存最终模型
-        print("💾 保存最终训练模型...")
+        # Save final model
+        print("💾 Saving final trained model...")
         trainer_emphasis.save_final_model(args.output_path, training_args)
         
-        # 如果设置了load_best_model_at_end，也保存最优模型的副本
+        # If load_best_model_at_end is enabled, also save a copy of the best model
         if training_args.load_best_model_at_end:
             best_model_path = os.path.join(args.output_path, "best_model")
             os.makedirs(best_model_path, exist_ok=True)
-            print(f"💎 保存最优模型副本到: {best_model_path}")
+            print(f"💎 Saving a copy of the best model to: {best_model_path}")
             trainer_emphasis.save_final_model(best_model_path, training_args)
     else:
-        # 仅评估模式
+        # Evaluation-only mode
         trainer_emphasis = WhiStressTrainer(
             args=training_args,
             model=whistress_model,
@@ -383,7 +384,7 @@ def train_or_evaluate(args):
             tokenizer=whistress_model.processor.feature_extractor,
         )
 
-    # 训练后评估
+    # Post-training evaluation
     trainer_emphasis.evaluate_at_word_level(
         # to ignore whisper_logits in the compute_metrics function (only the custom head logits are used)
         ignore_keys=["whisper_logits"],
@@ -397,7 +398,7 @@ def train_or_evaluate(args):
     #     dataset_name=f"{args.dataset_eval}-final",
     # )
 
-# 字符串转bool工具
+# String-to-bool helper
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -502,7 +503,7 @@ if __name__ == "__main__":
         "--seed",
         type=int,
         default=42,
-        help="随机种子（用于控制训练过程中的随机性）",
+        help="Random seed used to control stochastic behavior during training.",
     )
     parser.add_argument(
         "--stress_reg_coeff",
@@ -543,7 +544,7 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
 
-    # 如果未指定输出目录，则自动创建
+    # Auto-create output directory if not specified
     if not args.output_path:
         print("No output path provided, creating a new directory named 'training_results' in the current directory.")
         output_path = CURRENT_DIR / "training_results"

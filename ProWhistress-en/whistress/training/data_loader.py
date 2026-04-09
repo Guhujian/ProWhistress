@@ -1,9 +1,10 @@
-# data_loader.py 该文件实现了语音重音检测任务的数据加载器，支持本地和HuggingFace数据集的加载、预处理和分割
+# data_loader.py implements a data loader for speech emphasis detection tasks,
+# supporting local/HuggingFace dataset loading, preprocessing, and splitting.
 from whistress.training.processor import DSProcessor
 from datasets import load_from_disk
 import os
 
-# 通用数据加载类，支持本地和HuggingFace数据集
+# Generic data loader supporting both local and HuggingFace datasets.
 class PreprocessedDataLoader():
     """
     Generic data loading class for speech emphasis detection datasets.
@@ -33,7 +34,7 @@ class PreprocessedDataLoader():
                 transcription_column_name='transcription', 
                 split_train_val_percentage=0.02
             ):
-        # 初始化各项参数
+            # Initialize parameters
         self.preprocessed_dataset_path = preprocessed_dataset_path
         self.model_with_emphasis_head = model_with_emphasis_head
         self.hf_token = hf_token
@@ -43,7 +44,7 @@ class PreprocessedDataLoader():
         self.columns_to_remove = columns_to_remove
         self.transcription_column_name = transcription_column_name
         self.split_train_val_percentage = split_train_val_percentage
-        # 加载预处理数据集
+        # Load preprocessed dataset
         self.dataset = self.load_preproc_datasets(model_with_emphasis_head, 
                                                 preprocessed_dataset_path, 
                                                 columns_to_remove,
@@ -78,28 +79,28 @@ class PreprocessedDataLoader():
         Returns:
             Processed dataset with unnecessary columns removed
         """
-        # 内部函数：调整input_features格式
+        # Helper: adjust input_features format
         def change_input_features(example):
             example['input_features'] = example['input_features'][0]
             return example
-        # 内部函数：为每个样本添加句子索引
+        # Helper: add sentence index to each sample
         def add_sentence_index(row, index_container):
             curr_index = index_container['sentence_index']
             row['sentence_index'] = curr_index
             index_container["sentence_index"] += 1
             return row
         
-        # 优先加载本地预处理数据集，否则用DSProcessor处理后保存
+        # Prefer loading local preprocessed dataset; otherwise preprocess with DSProcessor and save
         if os.path.exists(preprocessed_dataset_path):
             train_set = load_from_disk(preprocessed_dataset_path)
             def safe_remove(ds_any, cols):
-                # 支持 DatasetDict 或 单个 Dataset
+                # Supports DatasetDict or a single Dataset
                 try:
                     is_dict = hasattr(ds_any, 'keys') and callable(ds_any.keys)
                 except Exception:
                     is_dict = False
                 if is_dict:
-                    # 从任意一个split拿列名（优先train，其次第一个split）
+                    # Get column names from one split (prefer train, otherwise the first split)
                     split_names = list(ds_any.keys())
                     ref_split = 'train' if 'train' in ds_any else split_names[0]
                     existing = set(ds_any[ref_split].column_names)
@@ -125,7 +126,7 @@ class PreprocessedDataLoader():
             if "labels" in train_set['train'].column_names:
                 train_set = train_set.rename_column("labels", f"labels_{transcription_column_name}")
             train_set.save_to_disk(os.path.join(preprocessed_dataset_path))            
-            # 仅移除存在的列，支持 DatasetDict 或 单个 Dataset
+            # Remove only columns that exist; supports DatasetDict or a single Dataset
             def safe_remove(ds_any, cols):
                 try:
                     is_dict = hasattr(ds_any, 'keys') and callable(ds_any.keys)
@@ -165,7 +166,7 @@ class PreprocessedDataLoader():
         return split["train"], split["test"]
  
 
-# 针对TinyStress-15K合成数据集的专用加载器
+    # Dedicated loader for the TinyStress-15K synthetic dataset.
 class PreprocessedTinyStress15KLoader(PreprocessedDataLoader):
     """
     Data loader for synthetic GPT-generated data.
@@ -176,20 +177,20 @@ class PreprocessedTinyStress15KLoader(PreprocessedDataLoader):
     """
     def __init__(self, model_with_emphasis_head, transcription_column_name, save_path):
         import os
-        # 指定数据集名称和要移除的列
-        # 如果本地预处理数据集存在，使用本地路径；否则使用HuggingFace数据集名称
-        # 处理相对路径，确保从正确的目录查找
+        # Set dataset name and columns to remove
+        # If local preprocessed data exists, use local path; otherwise use HuggingFace dataset name
+        # Resolve relative paths to ensure lookup from the correct directory
         if save_path.startswith('./'):
-            # 如果是相对路径，需要考虑当前工作目录
+            # For relative paths, consider the current working directory
             current_dir = os.getcwd()
-            # 如果当前目录不包含ProWhistress，则需要添加ProWhistress路径
+            # If current directory does not include ProWhistress, prepend ProWhistress path
             if 'ProWhistress' not in current_dir:
                 save_path = os.path.join('ProWhistress', save_path)
         
         if os.path.exists(save_path):
-            ds_hf_train = save_path  # 使用本地预处理数据集路径
+            ds_hf_train = save_path  # Use local preprocessed dataset path
         else:
-            ds_hf_train = "slprl/TinyStress-15K"  # 使用HuggingFace数据集名称
+            ds_hf_train = "slprl/TinyStress-15K"  # Use HuggingFace dataset name
         columns_to_remove = ['id', 'original_sample_index', 'ssml', 'emphasis_indices', 'metadata', 'audio']
         super().__init__(preprocessed_dataset_path=save_path, 
                         columns_to_remove=columns_to_remove,
@@ -217,8 +218,8 @@ class PreprocessedTinyStress15KLoader(PreprocessedDataLoader):
         return train_set, eval_set, test_set
     
     
-# 工厂函数：根据数据集名称返回对应的数据加载器
-# 支持扩展新数据集
+# Factory function: return the corresponding data loader by dataset name
+# Easy to extend with new datasets
 
 def load_data(model_with_emphasis_head, transcription_column_name, dataset_name, save_path=None):
     """

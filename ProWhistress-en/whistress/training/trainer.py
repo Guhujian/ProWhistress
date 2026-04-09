@@ -1,4 +1,5 @@
-# trainer.py 该文件实现了WhiStress模型的自定义训练器，支持token级和word级评估、模型保存等
+# trainer.py implements a custom trainer for the WhiStress model,
+# supporting token-level/word-level evaluation and model saving.
 from transformers import Seq2SeqTrainer
 from tqdm import tqdm
 import torch
@@ -6,7 +7,7 @@ import numpy as np
 import os
 import json
 
-# 自定义Trainer，扩展了transformers的Seq2SeqTrainer
+# Custom trainer extending transformers Seq2SeqTrainer.
 class WhiStressTrainer(Seq2SeqTrainer):
     """
     Custom trainer extending Seq2SeqTrainer for speech emphasis detection.
@@ -26,7 +27,7 @@ class WhiStressTrainer(Seq2SeqTrainer):
         Returns:
             Padded tensor of shape (batch_size, max_length)
         """
-        # 用-100填充到指定长度
+        # Pad to the target length using -100.
         pad_token_id = -100
 
         # Create a padded tensor using the custom pad token
@@ -54,7 +55,7 @@ class WhiStressTrainer(Seq2SeqTrainer):
         Returns:
             Loss value for the training step
         """
-        # 训练时去除sentence_index，防止其参与梯度
+        # Remove sentence_index during training so it does not affect gradients.
         sentence_index = inputs.pop("sentence_index")
         # Perform the default training step
         loss = super().training_step(model, inputs, num_items_in_batch=num_items_in_batch)
@@ -66,8 +67,8 @@ class WhiStressTrainer(Seq2SeqTrainer):
 
     def _maybe_log_save_evaluate(self, tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval, start_time=None, **kwargs):
         """
-        使用Transformers内置的评估与保存流程。
-        直接委托给父类以确保最佳模型判断与保存的官方逻辑生效。
+        Use the built-in Transformers evaluation and saving flow.
+        Delegate directly to the parent class to preserve official best-model logic.
         """
         return super()._maybe_log_save_evaluate(
             tr_loss,
@@ -82,23 +83,23 @@ class WhiStressTrainer(Seq2SeqTrainer):
 
     def _save_checkpoint(self, model, trial, metrics=None):
         """
-        保存检查点并输出简要信息；最佳模型判断交由父类处理。
+        Save checkpoint and print brief status; best-model selection is handled by parent class.
         """
-        print(f"💾 开始保存检查点 - 步骤: {self.state.global_step}")
-        # 调用父类的保存方法（不传递 metrics 参数，因为父类不接受）
+        print(f"💾 Starting checkpoint save - step: {self.state.global_step}")
+        # Call parent save method (do not pass metrics because parent does not accept it).
         super()._save_checkpoint(model, trial)
-        print(f"✅ 检查点保存完成 - 步骤: {self.state.global_step}")
+        print(f"✅ Checkpoint save completed - step: {self.state.global_step}")
 
-        # 输出当前跟踪到的最优模型信息（由父类更新）
+        # Print currently tracked best-model info (updated by parent class).
         best_metric = getattr(self.state, "best_metric", None)
         best_ckpt = getattr(self.state, "best_model_checkpoint", None)
         if best_metric is not None:
             try:
-                print(f"🏆 当前最优 {self.args.metric_for_best_model}: {float(best_metric):.4f}")
+                print(f"🏆 Current best {self.args.metric_for_best_model}: {float(best_metric):.4f}")
             except Exception:
-                print(f"🏆 当前最优 {self.args.metric_for_best_model}: {best_metric}")
+                print(f"🏆 Current best {self.args.metric_for_best_model}: {best_metric}")
         if best_ckpt:
-            print(f"📂 最优模型检查点: {best_ckpt}")
+            print(f"📂 Best model checkpoint: {best_ckpt}")
 
     def save_final_model(self, output_dir=None, training_args=None):
         """
@@ -114,7 +115,7 @@ class WhiStressTrainer(Seq2SeqTrainer):
             output_dir: Directory to save model components
             training_args: Training arguments to save
         """
-        # 只保存重音检测相关的头部和附加解码器层
+        # Save only emphasis-detection related heads and additional decoder layers.
         classifier = (
             self.model.classifier if hasattr(self.model, "classifier") else None
         )
@@ -124,7 +125,7 @@ class WhiStressTrainer(Seq2SeqTrainer):
             else None
         )
         if output_dir is not None:
-            print(f"💾 保存最终模型到: {output_dir}")
+            print(f"💾 Saving final model to: {output_dir}")
             
             torch.save(
                 classifier.state_dict(), os.path.join(output_dir, "classifier.pt")
@@ -133,25 +134,25 @@ class WhiStressTrainer(Seq2SeqTrainer):
                 additional_decoder_block.state_dict(),
                 os.path.join(output_dir, "additional_decoder_block.pt"),
             )
-            # 新增：保存重音编码器分支
+            # Also save stress-encoder branch
             if hasattr(self.model, "stress_encoder") and self.model.stress_encoder is not None:
                 torch.save(
                     self.model.stress_encoder.state_dict(),
                     os.path.join(output_dir, "stress_encoder.pt"),
                 )
-            # 新增：保存可训练的音频特征提取模块（如果存在）
+            # Also save trainable audio feature extractor (if present)
             if hasattr(self.model, "audio_feature_extractor") and self.model.audio_feature_extractor is not None:
                 torch.save(
                     self.model.audio_feature_extractor.state_dict(),
                     os.path.join(output_dir, "audio_feature_extractor.pt"),
                 )
-            # 新增：保存门控融合模块（如果存在）
+            # Also save fusion gate module (if present)
             if hasattr(self.model, "fusion_gate") and self.model.fusion_gate is not None:
                 torch.save(
                     self.model.fusion_gate.state_dict(),
                     os.path.join(output_dir, "fusion_gate.pt"),
                 )
-            # 新增：保存瓶颈线性层（如果存在）
+            # Also save bottleneck linear layers (if present)
             if hasattr(self.model, "dec_to_ctx"):
                 torch.save(
                     self.model.dec_to_ctx.state_dict(),
@@ -194,7 +195,7 @@ class WhiStressTrainer(Seq2SeqTrainer):
             with open(os.path.join(output_dir, "training_args.json"), "w") as file:
                 json.dump(training_args.to_dict(), file)
             
-            print(f"✅ 模型组件已成功保存到: {output_dir}")
+            print(f"✅ Model components saved successfully to: {output_dir}")
             print(f"   - classifier.pt")
             print(f"   - additional_decoder_block.pt")
             if hasattr(self.model, "stress_encoder") and self.model.stress_encoder is not None:
@@ -229,7 +230,7 @@ class WhiStressTrainer(Seq2SeqTrainer):
         Returns:
             Dictionary of evaluation metrics
         """
-        # token级别评估，逐batch推理并收集所有预测和标签
+        # Token-level evaluation: run batch inference and collect all predictions/labels.
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
         self.model.eval()
 
@@ -325,7 +326,7 @@ class WhiStressTrainer(Seq2SeqTrainer):
         Returns:
             Dictionary of word-level evaluation metrics
         """
-        # word级别评估，先聚合token到word再计算指标
+        # Word-level evaluation: aggregate token predictions to words, then compute metrics.
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
         self.model.eval()
 
@@ -459,7 +460,7 @@ class WhiStressTrainer(Seq2SeqTrainer):
         Returns:
             List of row indices to remove from evaluation
         """
-        # 检查预测和标签长度不一致的样本索引
+        # Identify sample indices where prediction and label lengths mismatch.
         pred_ids = pred["predictions"]
         label_ids = pred["label_ids"]
         pad_token_id = -100
@@ -489,7 +490,7 @@ class WhiStressTrainer(Seq2SeqTrainer):
         Returns:
             Example with added 'aligned_whisper_transcriptions' field
         """
-        # 用Whisper模型生成转录并与真实文本对齐
+        # Generate transcription with Whisper and align it with ground truth.
         token_ids = self.model.whisper_model.generate(input_features=example['input_features'].to('cuda').unsqueeze(0), 
                                                     labels=example['whisper_labels'].to('cuda').unsqueeze(0))
         transcription = self.model.processor.tokenizer.decode(token_ids[0], skip_special_tokens=True)
@@ -508,7 +509,7 @@ class WhiStressTrainer(Seq2SeqTrainer):
         Returns:
             Boolean indicating whether the example should be kept (True) or filtered out (False)
         """
-        # 过滤Whisper转录与真实文本不一致的样本
+        # Filter samples where Whisper transcription is inconsistent with ground truth.
         return example['aligned_whisper_transcriptions'] != ''
 
     def align_samples(self, dataset=None, ignore_keys=None, metric_key_prefix="eval"):
@@ -527,7 +528,7 @@ class WhiStressTrainer(Seq2SeqTrainer):
         Returns:
             List of indices for samples that should be removed due to alignment issues
         """
-        # 检查数据集中预测和标签长度不一致的样本
+        # Check for samples in the dataset where prediction and label lengths mismatch.
         eval_dataloader = self.get_eval_dataloader(dataset)
         self.model.eval()
 

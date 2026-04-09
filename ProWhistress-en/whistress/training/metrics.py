@@ -1,14 +1,15 @@
-# metrics.py 该文件实现了WhiStress模型的评估指标计算，支持准确率、精确率、召回率和F1
+# metrics.py implements evaluation metrics for the WhiStress model,
+# including accuracy, precision, recall, and F1.
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
-# 评估指标类，封装了多种常用指标
+# Metrics class encapsulating commonly used evaluation scores.
 class WhiStressMetrics:
     def __init__(self):
-        # 使用本地sklearn指标，不依赖在线evaluate库
+        # Use local sklearn metrics without relying on the online evaluate package.
         pass
 
     def compute_metrics(self, pred):
-        # 忽略被mask掉的标签（-100），只对有效部分计算指标
+        # Ignore masked labels (-100) and compute metrics only on valid positions.
         def ignore_masked_predictions(pred_ids, label_ids, pad_token_id):
             # Create a mask where label_ids is not equal to pad_token_id
             mask_label_ids = label_ids != pad_token_id
@@ -24,16 +25,16 @@ class WhiStressMetrics:
         preds, labels = ignore_masked_predictions(pred_ids, label_ids, -100)
 
         metrics = {}
-        # 计算准确率
+        # Compute accuracy
         metrics["accuracy"] = accuracy_score(labels, preds)
         
-        # 计算精确率
+        # Compute precision
         metrics["precision"] = precision_score(labels, preds, pos_label=1, zero_division=0)
         
-        # 计算召回率
+        # Compute recall
         metrics["recall"] = recall_score(labels, preds, pos_label=1, zero_division=0)
         
-        # 计算F1分数
+        # Compute F1 score
         metrics["f1"] = f1_score(labels, preds, pos_label=1, zero_division=0)
 
         return metrics

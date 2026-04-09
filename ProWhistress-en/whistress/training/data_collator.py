@@ -1,17 +1,18 @@
-# data_collator.py 该文件实现了用于语音序列到序列任务的数据整理器，支持自动填充、标签处理和特殊损失掩码等功能
+# data_collator.py implements a data collator for speech seq2seq tasks,
+# including automatic padding, label processing, and special loss masking.
 import torch.nn.functional as F
 import torch
 from dataclasses import dataclass
 from typing import List, Union, Any, Dict
 
-# 数据整理器：用于语音到文本（seq2seq）任务，支持填充和多头标签处理
+# Data collator for speech-to-text (seq2seq) tasks with padding and multi-head label handling.
 @dataclass
 class DataCollatorSpeechSeq2SeqWithPadding:
-    processor: Any  # Whisper处理器，包含特征提取器和分词器
-    decoder_start_token_id: int  # 解码器起始token id
-    forced_decoder_ids: int      # 强制解码token id
-    eos_token_id: int           # 句子结束token id
-    transcription_column_name: str  # 转录文本列名
+    processor: Any  # Whisper processor, including feature extractor and tokenizer
+    decoder_start_token_id: int  # Decoder start token id
+    forced_decoder_ids: int      # Forced decoder token id
+    eos_token_id: int           # End-of-sentence token id
+    transcription_column_name: str  # Transcription text column name
 
     def __call__(
         self, features: List[Dict[str, Union[List[int], torch.Tensor]]]
@@ -29,7 +30,8 @@ class DataCollatorSpeechSeq2SeqWithPadding:
         Args:
             features: List of feature dictionaries, each containing input features,
                       transcription labels, and emphasis labels
-                      # features是一个字典列表，每个字典包含音频特征、转录标签、重音标签等
+                      # features is a list of dictionaries, each containing audio
+                      # features, transcription labels, emphasis labels, etc.
         Returns:
             Dictionary containing padded tensors ready for model input:
             - input_features: Padded audio features
@@ -39,20 +41,20 @@ class DataCollatorSpeechSeq2SeqWithPadding:
 
         
         """
-        # 步骤1：提取并填充音频输入特征
-        # 找到包含input_features的key（兼容不同命名）
+        # Step 1: Extract and pad audio input features
+        # Find the key containing input_features (compatible with different naming styles)
         input_features_key = [elem for elem in list(features[0].keys()) if "input_features" in elem][0]
         input_features = [
             {"input_features": feature[input_features_key]} for feature in features
         ]
-        # 使用Whisper的特征提取器进行填充，返回张量
+        # Pad using Whisper feature extractor and return tensors
         batch = self.processor.feature_extractor.pad(
             input_features, return_tensors="pt"
         )
         
-        # 步骤2：确定Whisper转录标签的正确列名
+        # Step 2: Determine the correct column name for Whisper transcription labels
         whisper_labels_key = 'whisper_labels'
-        # 兼容不同数据集，自动查找包含labels且不是head的列名
+        # For dataset compatibility, auto-detect label columns containing "labels" but not "head"
         whisper_labels_key_opts = [elem for elem in list(features[0].keys()) if "labels" in elem and not "head" in elem and self.transcription_column_name in elem]
         if whisper_labels_key_opts != []:
             whisper_labels_key = whisper_labels_key_opts[0]
@@ -61,19 +63,19 @@ class DataCollatorSpeechSeq2SeqWithPadding:
                 f"More than one whisper_labels (backbone model labels) candidate found in features: {whisper_labels_key_opts}"
             )
             
-        # 步骤3：提取并填充转录标签序列
+        # Step 3: Extract and pad transcription label sequences
         labels = [
             {"input_ids": feature[whisper_labels_key]} for feature in features
         ]
-        # 用tokenizer进行填充，返回张量
+        # Pad with tokenizer and return tensors
         labels = self.processor.tokenizer.pad(labels, return_tensors="pt")
 
-        # 用-100替换padding部分，便于loss忽略
+        # Replace padding positions with -100 so they are ignored in loss
         labels = labels["input_ids"].masked_fill(
             labels.attention_mask.ne(1), -100
         )
 
-        # 步骤4：确定重音检测head标签的列名
+        # Step 4: Determine the column name for emphasis-head labels
         labels_head_key = 'labels_head'
         labels_head_key_opts = [elem for elem in list(features[0].keys()) if "labels_head" in elem and self.transcription_column_name in elem]
         if labels_head_key_opts != []:
@@ -82,15 +84,15 @@ class DataCollatorSpeechSeq2SeqWithPadding:
             raise ValueError(
                 f"More than one labels_head (added decoder head labels) candidate found in features: {labels_head_key_opts}"
             )
-        # 处理labels_head（自定义head标签）
+        # Process labels_head (custom head labels)
         labels_head = [
             {"labels_head": feature[labels_head_key]} for feature in features
         ]
-        # 将可能是list的labels_head统一转换为Tensor
+        # Convert labels_head to Tensor when provided as list
         for f in labels_head:
             if not isinstance(f["labels_head"], torch.Tensor):
                 f["labels_head"] = torch.tensor(f["labels_head"], dtype=torch.long)
-        # 计算最大长度，所有样本填充到同一长度
+        # Compute max length and pad all samples to the same length
         max_len = max(
             [len(f["labels_head"]) for f in labels_head]
         )  # Find max length
@@ -103,14 +105,14 @@ class DataCollatorSpeechSeq2SeqWithPadding:
             ]
         )
 
-        # 步骤5：对labels_head中的特殊token进行掩码处理
+        # Step 5: Mask special tokens in labels_head
         ignore_tokens = [
             self.decoder_start_token_id,
             self.forced_decoder_ids,
             self.eos_token_id,
         ]
 
-        # 如果BOS token已在前面加过，这里去掉（后续会再加）
+        # If BOS token has already been prepended, remove it here (it will be added later)
         labels_head = torch.where(
             torch.isin(labels, torch.tensor(list(ignore_tokens))),
             torch.tensor(-100),
@@ -120,11 +122,11 @@ class DataCollatorSpeechSeq2SeqWithPadding:
             labels = labels[:, 1:]
             labels_head = labels_head[:, 1:]
 
-        # 步骤6：构建最终batch字典
+        # Step 6: Build the final batch dictionary
         batch['whisper_labels'] = labels
         batch['labels_head'] = labels_head
         batch["sentence_index"] = torch.tensor([feature["sentence_index"] for feature in features])
-        # 检查labels_head和whisper_labels形状一致
+        # Ensure labels_head and whisper_labels have matching shapes
         assert batch['labels_head'].shape == batch['whisper_labels'].shape
 
         return batch

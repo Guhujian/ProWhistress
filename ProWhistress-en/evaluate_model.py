@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 """
 Standalone WhiStress model evaluation script.
 

@@ -1,11 +1,12 @@
-# processor.py 该文件实现了WhiStress数据集的处理流程，包括音频处理、分词、重音标签生成等
+# processor.py implements the WhiStress dataset processing pipeline,
+# including audio processing, tokenization, and emphasis label generation.
 import os
 import torch
 import re
 from datasets import load_dataset
 from scipy.signal import resample
 
-# 数据集处理器，负责音频、文本、标签的预处理
+# Dataset processor responsible for preprocessing audio, text, and labels.
 class DSProcessor:
     """
     Dataset processor for speech emphasis detection tasks.
@@ -26,7 +27,7 @@ class DSProcessor:
         ds_name,
         hf_token
     ):
-        # 初始化各项参数
+        # Initialize parameters
         self.processor = processor
         self.ds_name = ds_name
         self.hyperparameters = hyperparameters
@@ -39,13 +40,13 @@ class DSProcessor:
         Returns:
             Dataset object loaded from Hugging Face Hub or local path
         """
-        # 检查是否为本地路径
+        # Check whether ds_name points to a local path
         if os.path.exists(self.ds_name):
-            # 如果是本地路径，直接从磁盘加载
+            # If local path, load directly from disk
             from datasets import load_from_disk
             intonation_dataset = load_from_disk(self.ds_name)
         else:
-            # 否则从HuggingFace Hub加载数据集
+            # Otherwise, load dataset from Hugging Face Hub
             intonation_dataset = load_dataset(self.ds_name, token=self.hf_token)
         return intonation_dataset
 
@@ -66,7 +67,7 @@ class DSProcessor:
             - 'keys': List of word strings
             - 'values': List of token ID lists for each word
         """
-        # 该函数将转录文本中的每个单词映射到其对应的token id序列
+        # Map each word in transcription to its corresponding token-id sequence.
         def contains_no_alpha(s):
             return not re.search(r"[a-zA-Z\']", s)
 
@@ -134,14 +135,14 @@ class DSProcessor:
             Example with added labels_head_{transcription_column_name} field containing 
             a binary tensor with 1s for emphasized tokens and 0s otherwise
         """
-        # 该函数生成与token序列等长的二值向量，1表示重音token，0表示非重音
+        # Build a binary vector aligned with tokens: 1 for emphasized token, 0 otherwise.
         curr_tokenized_sentence = self.processor.tokenizer(
             example[transcription_column_name]
         ).input_ids
         curr_values = example[f"map_dict_{transcription_column_name}"]["values"]
-        # 支持两种重音标注格式：索引列表或二值向量
+        # Supports two emphasis annotation formats: index list or binary vector.
         if emphasis_indices_column_name=="emphasis_indices" or emphasis_indices_column_name=="emphasis_indices_nru":
-            # 索引列表格式
+            # Index-list format
             concatenated_values = []
             if len(curr_values) > example[emphasis_indices_column_name][-1]:
                 concatenated_values = [
@@ -150,7 +151,7 @@ class DSProcessor:
             else:
                 print(example['sentence_index'])                
         else:
-            # 二值向量格式
+            # Binary-vector format
             indices = [index for index, value in enumerate(example[emphasis_indices_column_name]) if value == 1]
             concatenated_values = [
                 item for elem in indices for item in curr_values[elem]
@@ -182,7 +183,7 @@ class DSProcessor:
             Example with added labels_{transcription_column_name} field containing 
             tokenized transcription IDs
         """
-        # 为每个样本添加token级别的标签，并校验长度一致
+        # Add token-level labels for each sample and verify matching lengths.
         example[f"labels_{transcription_column_name}"] = self.processor.tokenizer(example[transcription_column_name]).input_ids
         assert len(example[f"labels_head_{transcription_column_name}"]) == len(example[f"labels_{transcription_column_name}"])
         return example
@@ -202,7 +203,7 @@ class DSProcessor:
         Returns:
             Example with added input_features and aligned_whisper_transcriptions fields
         """
-        # 该函数用Whisper模型生成转录，并与真实文本对齐，若词数一致则保留
+        # Generate Whisper transcription and keep it only when word count aligns with ground truth.
         num_samples = int(len(example["audio"]["array"]) * 16000 / example['audio']['sampling_rate'])
         downsampled_audio_array = resample(example["audio"]["array"], num_samples)
 
@@ -235,7 +236,7 @@ class DSProcessor:
         Returns:
             Boolean indicating whether the example should be kept (True) or filtered out (False)
         """
-        # 过滤Whisper转录与真实文本不一致的样本
+        # Filter samples where Whisper transcription is inconsistent with ground truth.
         return example[transcription_column_name] != ''
 
     def filter_incorrect_transcription(self, example, transcription_column_name):
@@ -252,7 +253,7 @@ class DSProcessor:
         Returns:
             Boolean indicating whether the example should be kept (True) or filtered out (False)
         """
-        # 过滤token映射与单词数不一致的样本
+        # Filter samples where token mapping count differs from word count.
         transcription = example[transcription_column_name]
         values = [val for val in example[f"map_dict_{transcription_column_name}"]["values"] if len(val) != 0]
         return len(transcription.split(" ")) == len(values)
@@ -279,7 +280,7 @@ class DSProcessor:
         Returns:
             Fully preprocessed dataset ready for training
         """
-        # 数据集完整预处理流程，依次执行各步骤
+        # Full dataset preprocessing pipeline executed step by step.
         proccess_methods = {
             "aligned_whisper_transcriptions": lambda example: self.aligned_whisper_transcriptions(example, model),
             "filter_misaligned_samples": lambda example: self.filter_misaligned_samples(example, transcription_column_name),
@@ -337,7 +338,7 @@ class DSProcessor:
         Returns:
             Preprocessed dataset in PyTorch format, ready for training
         """
-        # 获取最终可用于训练的预处理数据集
+        # Get the final preprocessed dataset ready for training.
         preproc_intonation_dataset = self.preprocess(
             model=model,
             emphasis_indices_column_name=emphasis_indices_column_name,

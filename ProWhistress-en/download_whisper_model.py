@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 """
 Script to download the Whisper model to a local directory.
 """
