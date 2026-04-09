@@ -4,8 +4,8 @@ This repository contains the official implementation for both English and Chines
 
 ## 📂 Project Structure
 
-* [**English Model (ProWhistress-en)**](ProWhistress-en)
-* [**Chinese Model (ProWhistress-cn)**](ProWhistress-cn)
+- [English Model (ProWhistress-en)](./ProWhistress-en/README.md)
+- [Chinese Model (ProWhistress-cn)](./ProWhistress-cn/README.md)
 
 Please click the links above to access the respective subdirectories for detailed usage instructions.
 
