@@ -4,7 +4,7 @@ This repository contains the official implementation for both English and Chines
 
 ## 🔗 Demo
 
-- Online demo: https://e148b04447a28e4c55.gradio.live/
+- Online demo: https://d5d1b01d310258d6be.gradio.live
 
 ## 📂 Project Structure
 
