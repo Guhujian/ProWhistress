@@ -2,9 +2,6 @@
 
 This repository contains the official implementation for both English and Chinese versions of the ProWhistress model, submitted to **Interspeech 2026**. Paper ID 1303.
 
-## 🔗 Demo
-
-- Online demo: https://d5d1b01d310258d6be.gradio.live
 
 ## 📂 Project Structure
 
